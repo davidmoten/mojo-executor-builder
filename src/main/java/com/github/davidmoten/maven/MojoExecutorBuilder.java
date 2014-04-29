@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.List;
+import java.util.Set;
 
 import javassist.bytecode.AnnotationsAttribute;
 import javassist.bytecode.ClassFile;
@@ -72,6 +73,7 @@ public class MojoExecutorBuilder {
 						AnnotationsAttribute invisible = (AnnotationsAttribute) fi
 								.getAttribute(AnnotationsAttribute.invisibleTag);
 						boolean isParameter = false;
+						StringBuilder memberNames = new StringBuilder();
 						if (invisible != null)
 							for (javassist.bytecode.annotation.Annotation ann : invisible
 									.getAnnotations()) {
@@ -79,9 +81,20 @@ public class MojoExecutorBuilder {
 										.equals(org.apache.maven.plugins.annotations.Parameter.class
 												.getName()))
 									isParameter = true;
+								if (ann.getMemberNames() != null)
+									for (String memberName : (Set<String>) ann
+											.getMemberNames()) {
+										if (memberNames.length() > 0)
+											memberNames.append(", ");
+										memberNames.append(memberName);
+										memberNames.append("=");
+										memberNames.append(ann
+												.getMemberValue(memberName));
+									}
 							}
 						if (isParameter)
-							System.out.println("    field: " + fi.getName());
+							System.out.println("    field: " + fi.getName()
+									+ " -> " + memberNames);
 					}
 					c = c.getSuperclass();
 				}
