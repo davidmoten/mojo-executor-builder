@@ -3,6 +3,7 @@ package com.github.davidmoten.maven;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -49,9 +50,16 @@ public class MojoExecutorBuilder {
 				NodeList children = mojo.getChildNodes();
 				String goal = getValue(children, "goal");
 				String mojoClassName = getValue(children, "implementation");
-				System.out.println("mojo: " + goal + "[" + mojoClassName + "]");
+				System.out.println("  mojo: " + goal + "[" + mojoClassName
+						+ "]");
 				for (Method m : getMethods(mojoClassName)) {
-
+					if (m.getName().startsWith("get")
+							&& !m.getName().equals("getClass")) {
+						System.out.println("    method: " + m.getName());
+						for (Annotation a : m.getAnnotations())
+							System.out.println("      annotation: "
+									+ a.toString());
+					}
 				}
 			}
 		} catch (XPathExpressionException e) {
