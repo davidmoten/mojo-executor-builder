@@ -5,7 +5,6 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.List;
@@ -22,7 +21,6 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
-import org.apache.maven.plugins.annotations.Parameter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -62,39 +60,31 @@ public class MojoExecutorBuilder {
 				System.out.println("  mojo: " + goal + "[" + mojoClassName
 						+ "]");
 
-				Parameter p;
-				Class<?> cls = getCls(mojoClassName);
-				while (cls != null) {
-					System.out.println("    class: " + cls);
-					for (Field f : cls.getDeclaredFields()) {
-						// f.setAccessible(true);
-						System.out.println("      field: " + f.getName());
-						for (Annotation a : f.getDeclaredAnnotations())
-							System.out.println("      annotation: "
-									+ a.toString());
-					}
-					cls = cls.getSuperclass();
-				}
 				Class<?> c = getCls(mojoClassName);
-				URL location = c.getResource('/'
-						+ c.getName().replace('.', '/') + ".class");
-				DataInputStream dstream = new DataInputStream(
-						new BufferedInputStream(location.openStream()));
+				while (c != null) {
+					URL location = c.getResource('/'
+							+ c.getName().replace('.', '/') + ".class");
+					DataInputStream dstream = new DataInputStream(
+							new BufferedInputStream(location.openStream()));
 
-				ClassFile cf = new ClassFile(dstream);
-				for (FieldInfo fi : (List<FieldInfo>) cf.getFields()) {
-					System.out.println(fi);
-					AnnotationsAttribute visible = (AnnotationsAttribute) fi
-							.getAttribute(AnnotationsAttribute.visibleTag);
-					AnnotationsAttribute invisible = (AnnotationsAttribute) fi
-							.getAttribute(AnnotationsAttribute.invisibleTag);
-					if (invisible != null)
-						for (javassist.bytecode.annotation.Annotation ann : invisible
-								.getAnnotations()) {
-							System.out.println("@" + ann.getTypeName());
-						}
+					ClassFile cf = new ClassFile(dstream);
+					for (FieldInfo fi : (List<FieldInfo>) cf.getFields()) {
+						AnnotationsAttribute invisible = (AnnotationsAttribute) fi
+								.getAttribute(AnnotationsAttribute.invisibleTag);
+						boolean isParameter = false;
+						if (invisible != null)
+							for (javassist.bytecode.annotation.Annotation ann : invisible
+									.getAnnotations()) {
+								if (ann.getTypeName()
+										.equals(org.apache.maven.plugins.annotations.Parameter.class
+												.getName()))
+									isParameter = true;
+							}
+						if (isParameter)
+							System.out.println("    field: " + fi.getName());
+					}
+					c = c.getSuperclass();
 				}
-
 			}
 		} catch (XPathExpressionException e) {
 			throw new RuntimeException(e);
