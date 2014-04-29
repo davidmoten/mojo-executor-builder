@@ -92,9 +92,23 @@ public class MojoExecutorBuilder {
 												.getMemberValue(memberName));
 									}
 							}
-						if (isParameter)
-							System.out.println("    field: " + fi.getName()
-									+ " -> " + memberNames);
+						if (isParameter) {
+							String baseType = c.getDeclaredField(fi.getName())
+									.getType().getName();
+							String genericType;
+							if (c.getTypeParameters().length > 0)
+								genericType = c.getTypeParameters()[0]
+										.getName();
+							else
+								genericType = null;
+							System.out.println("    field: "
+									+ fi.getName()
+									+ ": "
+									+ baseType
+									+ (genericType == null ? "" : "<"
+											+ genericType + ">") + " -> "
+									+ memberNames);
+						}
 					}
 					c = c.getSuperclass();
 				}
@@ -104,6 +118,8 @@ public class MojoExecutorBuilder {
 		} catch (SecurityException e) {
 			throw new RuntimeException(e);
 		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (NoSuchFieldException e) {
 			throw new RuntimeException(e);
 		}
 
