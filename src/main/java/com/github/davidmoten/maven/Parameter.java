@@ -1,23 +1,74 @@
 package com.github.davidmoten.maven;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class Parameter {
-	private final Map<String, String> map;
 	private final String name;
+	private final String alias;
+	private final String property;
+	private final String defaultValue;
+	private final boolean required;
+	private final boolean readonly;
 
-	public Parameter(Map<String, String> map, String name) {
-		this.map = new HashMap<String, String>(map);
+	public Parameter(String name, String alias, String property,
+			String defaultValue, Boolean required, Boolean readonly) {
 		this.name = name;
+		this.alias = alias;
+		this.property = property;
+		this.defaultValue = defaultValue;
+
+		this.required = (required == null ? false : required);
+		this.readonly = (readonly == null ? false : readonly);
 	}
 
-	public String methodName() {
+	public String getMethodName() {
 		String s;
-		if (map.get("property") != null)
-			s = map.get("property");
+		if (property != null)
+			s = property;
 		else
 			s = name;
 		return s.replaceAll("\\.", "_");
 	}
+
+	public String getName() {
+		return name;
+	}
+
+	public String getAlias() {
+		return alias;
+	}
+
+	public String getProperty() {
+		return property;
+	}
+
+	public String getDefaultValue() {
+		return defaultValue;
+	}
+
+	public boolean isRequired() {
+		return required;
+	}
+
+	public boolean isReadonly() {
+		return readonly;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Parameter [name=");
+		builder.append(name);
+		builder.append(", alias=");
+		builder.append(alias);
+		builder.append(", property=");
+		builder.append(property);
+		builder.append(", defaultValue=");
+		builder.append(defaultValue);
+		builder.append(", required=");
+		builder.append(required);
+		builder.append(", readonly=");
+		builder.append(readonly);
+		builder.append("]");
+		return builder.toString();
+	}
+
 }
