@@ -149,28 +149,9 @@ public class MojoExecutorBuilder {
 				else
 					genericType = absent();
 
-				boolean baseTypeStartsWithLowerCase = Character
-						.isLowerCase(parameter.getBaseType().charAt(0));
-				if (parameter.isCollection()) {
-					if (genericType.isPresent())
-						out.format("      private %s<%s> %s = %s;\n", baseType,
-								genericType, parameter.getMethodName(),
-								quoteIfNotNull(parameter.getDefaultValue()));
-					else
-						out.format("      private %s<String> %s = %s;\n",
-								baseType, parameter.getMethodName(),
-								quoteIfNotNull(parameter.getDefaultValue()));
-
-				} else if (parameter.isArray()) {
-
-				} else if (parameter.isMap()) {
-
-				} else if (parameter.isProperties()) {
-
-				} else
-					out.format("      private String %s = %s;\n",
-							parameter.getMethodName(),
-							quoteIfNotNull(parameter.getDefaultValue()));
+				out.format("      private String %s = %s;\n",
+						parameter.getMethodName(),
+						quoteIfNotNull(parameter.getDefaultValue()));
 			}
 			out.format("  }\n\n");
 		}
