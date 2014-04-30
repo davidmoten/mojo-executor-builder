@@ -1,10 +1,15 @@
 package com.github.davidmoten.maven;
 
+import static com.google.common.base.Optional.fromNullable;
+
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +29,8 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.WordUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -35,9 +42,127 @@ public class MojoExecutorBuilder {
 			InputStream pluginXml) {
 		sourceDir.mkdirs();
 		List<Mojo> mojos = getMojos(pluginXml);
-		for (Mojo mojo : mojos)
+		for (Mojo mojo : mojos) {
 			System.out.println(mojo);
+		}
+		File file = createBuilder(sourceDir, artifact, pkg, mojos);
+		System.out.println();
+		System.out.println(file.getPath());
+		System.out.println();
+		System.out.println("-----------------------------------");
+		logFileContent(file);
+	}
 
+	private void logFileContent(File file) {
+		try {
+			System.out.println(IOUtils.toString(new FileInputStream(file)));
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private File createBuilder(File sourceDir, Artifact artifact, String pkg1,
+			List<Mojo> mojos) {
+		String path = getPath(artifact);
+		File file = new File(sourceDir, path);
+		String pkg = getPackage(path);
+		createBuilder(file, pkg, mojos);
+		return file;
+	}
+
+	private String getPackage(String path) {
+		String pkg = path.replace("/", ".");
+		pkg = pkg.substring(0, pkg.lastIndexOf("."));
+		pkg = pkg.substring(0, pkg.lastIndexOf("."));
+		return pkg;
+	}
+
+	private String getPath(Artifact artifact) {
+		String path = artifact.getGroupId().replace(".", " ").replace("-", " ")
+				+ "/"
+				+ WordUtils.capitalize(
+						artifact.getArtifactId().replace("-", " ")
+								.replace("_", " ")).replace(" ", "") + "_"
+				+ artifact.getVersion().replace(".", "_") + ".java";
+		path = path.replace(" ", "/");
+		return path;
+	}
+
+	private void createBuilder(File file, String pkg, List<Mojo> mojos) {
+		PrintStream out = null;
+		try {
+			file.getParentFile().mkdirs();
+			out = new PrintStream(file);
+			String className = file.getName().substring(0,
+					file.getName().lastIndexOf("."));
+			createBuilder(out, pkg, className, mojos);
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		} finally {
+			if (out != null)
+				out.close();
+		}
+	}
+
+	private void createBuilder(PrintStream out, String pkg, String className,
+			List<Mojo> mojos) {
+		ImportManager im = new ImportManager();
+		out.format("package %s;\n\n", pkg);
+		out.format("// imports here\n\n");
+		out.format("public class %s {\n\n", className);
+		for (Mojo mojo : mojos) {
+			String builderClassName = im.add(
+					pkg,
+					className,
+					WordUtils.capitalize(
+							mojo.getGoal().replace("-", " ").replace(".", " "))
+							.replace(" ", "")
+							+ "Builder");
+			String goalMethod = WordUtils.capitalize(
+					mojo.getGoal().replace("-", " ").replace(".", " "))
+					.replace(" ", "");
+			goalMethod = Character.toLowerCase(goalMethod.charAt(0))
+					+ goalMethod.substring(1);
+			out.format("  public static %s %s() {\n", builderClassName,
+					goalMethod);
+			out.format("    return new %s();\n", builderClassName);
+			out.format("  }\n\n");
+
+			out.format("  public static class %s {\n\n", builderClassName);
+			for (Parameter parameter : mojo.getParameters()) {
+				String defaultValue = parameter.getDefaultValue();
+				String baseType = im.add(parameter.getBaseType());
+				boolean baseTypeStartsWithLowerCase = Character
+						.isLowerCase(parameter.getBaseType().charAt(0));
+				if (parameter.isArray()) {
+					String listType = im.add(List.class);
+					out.format("      private %s<%s> %s = new %s<%s>();\n",
+							listType, baseType, parameter.getMethodName(),
+							im.add(ArrayList.class), baseType);
+				} else if (parameter.getBaseType().equals("boolean")
+						&& defaultValue != null)
+					out.format("      private %s %s = %s;\n", baseType,
+							parameter.getMethodName(), defaultValue);
+				else if (!parameter.getBaseType()
+						.equals(String.class.getName())
+						&& baseTypeStartsWithLowerCase && defaultValue != null)
+					out.format("      private %s %s = new %s(\"%s\");\n",
+							baseType, parameter.getMethodName(), baseType,
+							defaultValue);
+				else if (baseTypeStartsWithLowerCase)
+					out.format("      private %s %s = %s;\n", baseType,
+							parameter.getMethodName(), defaultValue);
+				else if (parameter.getBaseType().equals("java.lang.String"))
+					out.format("      private %s %s = \"%s\";\n", baseType,
+							parameter.getMethodName(), defaultValue);
+
+			}
+			out.format("  }\n\n");
+		}
+		out.format("}");
+		out.println(im.getImportBlock());
 	}
 
 	private List<Mojo> getMojos(InputStream pluginXml) {
@@ -93,6 +218,7 @@ public class MojoExecutorBuilder {
 		return mojoList;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static List<Parameter> getParameters(Class<?> c) {
 		try {
 			List<Parameter> parameters = new ArrayList<Parameter>();
@@ -123,19 +249,29 @@ public class MojoExecutorBuilder {
 
 					}
 				if (isParameter) {
-					String baseType = c.getDeclaredField(fi.getName())
-							.getType().getName();
+					Class<?> type = c.getDeclaredField(fi.getName()).getType();
+					final String baseType;
+					if (type.isArray())
+						baseType = type.getComponentType().getName();
+					else
+						baseType = type.getName();
 					String genericType;
 					if (c.getTypeParameters().length > 0)
 						genericType = c.getTypeParameters()[0].getName();
 					else
 						genericType = null;
-					parameters.add(new Parameter(fi.getName(), memberNames
-							.get("alias"), memberNames.get("property"),
-							memberNames.get("defaultValue"),
-							toBoolean(memberNames.get("required")),
-							toBoolean(memberNames.get("readonly"))));
 
+					parameters
+							.add(new Parameter(
+									fi.getName(),
+									stripQuotes(memberNames.get("alias")),
+									stripQuotes(memberNames.get("property")),
+									stripQuotes(memberNames.get("defaultValue")),
+									toBoolean(stripQuotes(memberNames
+											.get("required"))),
+									toBoolean(stripQuotes(memberNames
+											.get("readonly"))), baseType,
+									fromNullable(genericType), type.isArray()));
 				}
 			}
 			return parameters;
@@ -146,6 +282,13 @@ public class MojoExecutorBuilder {
 		} catch (SecurityException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	private static String stripQuotes(String s) {
+		if (s == null)
+			return null;
+		else
+			return s.replace("\"", "");
 	}
 
 	private static Boolean toBoolean(String s) {

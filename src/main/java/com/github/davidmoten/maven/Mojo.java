@@ -13,6 +13,18 @@ public class Mojo {
 		this.parameters = parameters;
 	}
 
+	public String getGoal() {
+		return goal;
+	}
+
+	public String getMojoClassName() {
+		return mojoClassName;
+	}
+
+	public List<Parameter> getParameters() {
+		return parameters;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
