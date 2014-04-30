@@ -1,6 +1,8 @@
 package com.github.davidmoten.maven;
 
+import static com.google.common.base.Optional.absent;
 import static com.google.common.base.Optional.fromNullable;
+import static com.google.common.base.Optional.of;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -35,6 +37,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+
+import com.google.common.base.Optional;
 
 public class MojoExecutorBuilder {
 
@@ -108,10 +112,13 @@ public class MojoExecutorBuilder {
 
 	private void createBuilder(PrintStream out, String pkg, String className,
 			List<Mojo> mojos) {
+
 		ImportManager im = new ImportManager();
 		out.format("package %s;\n\n", pkg);
 		out.format("// imports here\n\n");
 		out.format("public class %s {\n\n", className);
+		out.format("  private String evaluateBoolean(String value) {\n    return value;\n  }\n\n");
+
 		for (Mojo mojo : mojos) {
 			String builderClassName = im.add(
 					pkg,
@@ -132,37 +139,50 @@ public class MojoExecutorBuilder {
 
 			out.format("  public static class %s {\n\n", builderClassName);
 			for (Parameter parameter : mojo.getParameters()) {
+				// TODO handle
+				// boolean,Boolean,byte,Byte,int,Integer,long,Long,short,Short,double,Double,float,Float,Date,URL,String,Arrays,Collection,Map,Properties
 				String defaultValue = parameter.getDefaultValue();
 				String baseType = im.add(parameter.getBaseType());
+				Optional<String> genericType;
+				if (parameter.getGenericType().isPresent())
+					genericType = of(im.add(parameter.getGenericType().get()));
+				else
+					genericType = absent();
+
 				boolean baseTypeStartsWithLowerCase = Character
 						.isLowerCase(parameter.getBaseType().charAt(0));
-				if (parameter.isArray()) {
-					String listType = im.add(List.class);
-					out.format("      private %s<%s> %s = new %s<%s>();\n",
-							listType, baseType, parameter.getMethodName(),
-							im.add(ArrayList.class), baseType);
-				} else if (parameter.getBaseType().equals("boolean")
-						&& defaultValue != null)
-					out.format("      private %s %s = %s;\n", baseType,
-							parameter.getMethodName(), defaultValue);
-				else if (!parameter.getBaseType()
-						.equals(String.class.getName())
-						&& baseTypeStartsWithLowerCase && defaultValue != null)
-					out.format("      private %s %s = new %s(\"%s\");\n",
-							baseType, parameter.getMethodName(), baseType,
-							defaultValue);
-				else if (baseTypeStartsWithLowerCase)
-					out.format("      private %s %s = %s;\n", baseType,
-							parameter.getMethodName(), defaultValue);
-				else if (parameter.getBaseType().equals("java.lang.String"))
-					out.format("      private %s %s = \"%s\";\n", baseType,
-							parameter.getMethodName(), defaultValue);
+				if (parameter.isCollection()) {
+					if (genericType.isPresent())
+						out.format("      private %s<%s> %s = %s;\n", baseType,
+								genericType, parameter.getMethodName(),
+								quoteIfNotNull(parameter.getDefaultValue()));
+					else
+						out.format("      private %s<String> %s = %s;\n",
+								baseType, parameter.getMethodName(),
+								quoteIfNotNull(parameter.getDefaultValue()));
 
+				} else if (parameter.isArray()) {
+
+				} else if (parameter.isMap()) {
+
+				} else if (parameter.isProperties()) {
+
+				} else
+					out.format("      private String %s = %s;\n",
+							parameter.getMethodName(),
+							quoteIfNotNull(parameter.getDefaultValue()));
 			}
 			out.format("  }\n\n");
 		}
 		out.format("}");
 		out.println(im.getImportBlock());
+	}
+
+	private String quoteIfNotNull(String s) {
+		if (s == null)
+			return s;
+		else
+			return "\"" + s + "\"";
 	}
 
 	private List<Mojo> getMojos(InputStream pluginXml) {

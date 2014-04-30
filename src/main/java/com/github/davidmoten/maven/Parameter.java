@@ -1,5 +1,10 @@
 package com.github.davidmoten.maven;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Properties;
+
 import com.google.common.base.Optional;
 
 public class Parameter {
@@ -93,4 +98,32 @@ public class Parameter {
 		return builder.toString();
 	}
 
+	public boolean isCollection() {
+		return baseTypeIs(Collection.class);
+	}
+
+	private boolean baseTypeIs(Class<?> c) {
+		if (isPrimitive(baseType))
+			return false;
+		try {
+			Class<?> cls = Class.forName(baseType);
+			return (c.isAssignableFrom(cls));
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public boolean isMap() {
+		return baseTypeIs(Map.class);
+	}
+
+	public boolean isProperties() {
+		return baseTypeIs(Properties.class);
+	}
+
+	private static boolean isPrimitive(String className) {
+		String[] prims = { "boolean", "short", "int", "double", "float",
+				"long", "char" };
+		return Arrays.asList(prims).contains(className);
+	}
 }
