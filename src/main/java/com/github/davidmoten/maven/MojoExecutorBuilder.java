@@ -148,7 +148,6 @@ public class MojoExecutorBuilder {
 					genericType = of(im.add(parameter.getGenericType().get()));
 				else
 					genericType = absent();
-
 				out.format("      private String %s = %s;\n",
 						parameter.getMethodName(),
 						quoteIfNotNull(parameter.getDefaultValue()));
